@@ -248,6 +248,35 @@ class ChatViewModel(private val context: Context) : ViewModel() {
     }
     val chatHistories: StateFlow<List<ChatHistory>> by lazy { chatHistoryDelegate.chatHistories }
     val currentChatId: StateFlow<String?> by lazy { chatHistoryDelegate.currentChatId }
+
+    private val autoContinueFlag = java.util.concurrent.atomic.AtomicBoolean(true)
+    private var autoContinueTicks = 0
+
+    init {
+        viewModelScope.launch {
+            while (true) {
+                kotlinx.coroutines.delay(6000L)
+                try {
+                    if (!autoContinueFlag.get()) continue
+                    val chatId = currentChatId.value ?: continue
+                    if (messageProcessingDelegate.isChatLoading(chatId)) continue
+                    val hist = chatHistory.value
+                    val last = hist.lastOrNull() ?: continue
+                    val lastUser = hist.lastOrNull { it.sender == "user" }
+                    if (lastUser?.content?.contains("停止自动继续") == true) {
+                        autoContinueFlag.set(false)
+                        continue
+                    }
+                    if (last.sender != "ai") continue
+                    if (autoContinueTicks >= 400) continue
+                    autoContinueTicks++
+                    sendTextMessage("继续", chatId)
+                } catch (e: Exception) {
+                    AppLogger.e(TAG, "autoContinue failed", e)
+                }
+            }
+        }
+    }
     val hasOlderDisplayHistory: StateFlow<Boolean> by lazy {
         chatHistoryDelegate.hasOlderDisplayHistory
     }
