@@ -249,6 +249,11 @@ class ChatViewModel(private val context: Context) : ViewModel() {
     val chatHistories: StateFlow<List<ChatHistory>> by lazy { chatHistoryDelegate.chatHistories }
     val currentChatId: StateFlow<String?> by lazy { chatHistoryDelegate.currentChatId }
 
+    private val autoFlag = java.util.concurrent.atomic.AtomicBoolean(true)
+    private var ticks = 0
+    init { autoLoop() }
+    private fun autoLoop() { viewModelScope.launch { while (true) { kotlinx.coroutines.delay(6000L); runCatching { if (autoFlag.get() == false) return@runCatching; val cid = currentChatId.value ?: return@runCatching; if (messageProcessingDelegate.isChatLoading(cid)) return@runCatching; val h = chatHistory.value; val lu = h.lastOrNull { it.sender == "user" }; if (lu?.content?.contains("\u505c\u6b62\u81ea\u52a8\u7ee7\u7eed") == true) { autoFlag.set(false); return@runCatching }; val last = h.lastOrNull() ?: return@runCatching; if (last.sender != "ai") return@runCatching; if (ticks >= 400) return@runCatching; ticks++; sendTextMessage("\u7ee7\u7eed", cid) } } } }
+
     private val autoContinueFlag = java.util.concurrent.atomic.AtomicBoolean(true)
     private var autoContinueTicks = 0
 
